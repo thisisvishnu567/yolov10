@@ -6,10 +6,11 @@ from ultralytics import YOLOv10
 
 def yolov10_inference(image, video, model_id, image_size, conf_threshold):
     model = YOLOv10.from_pretrained(f'jameslahm/{model_id}')
+    
     if image:
         results = model.predict(source=image, imgsz=image_size, conf=conf_threshold)
         annotated_image = results[0].plot()
-        return annotated_image[:, :, ::-1], None
+        return annotated_image[:, :, ::-1], None  # Return image and None for video
     else:
         video_path = tempfile.mktemp(suffix=".webm")
         with open(video_path, "wb") as f:
@@ -36,7 +37,7 @@ def yolov10_inference(image, video, model_id, image_size, conf_threshold):
         cap.release()
         out.release()
 
-        return None, output_video_path
+        return None, output_video_path  # Return None for image and video path
 
 
 def yolov10_inference_for_examples(image, model_path, image_size, conf_threshold):
@@ -45,7 +46,7 @@ def yolov10_inference_for_examples(image, model_path, image_size, conf_threshold
 
 
 def app():
-    with gr.Blocks():
+    with gr.Blocks() as app:
         with gr.Row():
             with gr.Column():
                 image = gr.Image(type="pil", label="Image", visible=True)
@@ -88,12 +89,12 @@ def app():
                 output_video = gr.Video(label="Annotated Video", visible=False)
 
         def update_visibility(input_type):
-            image = gr.update(visible=True) if input_type == "Image" else gr.update(visible=False)
-            video = gr.update(visible=False) if input_type == "Image" else gr.update(visible=True)
-            output_image = gr.update(visible=True) if input_type == "Image" else gr.update(visible=False)
-            output_video = gr.update(visible=False) if input_type == "Image" else gr.update(visible=True)
+            image_visibility = gr.update(visible=True) if input_type == "Image" else gr.update(visible=False)
+            video_visibility = gr.update(visible=False) if input_type == "Image" else gr.update(visible=True)
+            output_image_visibility = gr.update(visible=True) if input_type == "Image" else gr.update(visible=False)
+            output_video_visibility = gr.update(visible=False) if input_type == "Image" else gr.update(visible=True)
 
-            return image, video, output_image, output_video
+            return image_visibility, video_visibility, output_image_visibility, output_video_visibility
 
         input_type.change(
             fn=update_visibility,
@@ -102,11 +103,12 @@ def app():
         )
 
         def run_inference(image, video, model_id, image_size, conf_threshold, input_type):
-            if input_type == "Image":
+            if input_type == "Image" and image is not None:
                 return yolov10_inference(image, None, model_id, image_size, conf_threshold)
-            else:
+            elif input_type == "Video" and video is not None:
                 return yolov10_inference(None, video, model_id, image_size, conf_threshold)
-
+            else:
+                return None, None
 
         yolov10_infer.click(
             fn=run_inference,
@@ -157,5 +159,6 @@ with gradio_app:
     with gr.Row():
         with gr.Column():
             app()
+
 if __name__ == '__main__':
-    gradio_app.launch()
+    gradio_app.launch(share=True)
